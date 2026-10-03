@@ -137,3 +137,11 @@ export function formatDuration(ms: number): string {
   if (minutes < 60) return `${minutes}m ${seconds % 60}s`
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
 }
+
+// Whole minutes, nothing under one: for the Desktop app, which flashes on every redraw.
+export function formatMinutes(ms: number): string | undefined {
+  const minutes = Math.floor(ms / 60_000)
+  if (minutes < 1) return undefined
+  if (minutes < 60) return `${minutes}m`
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
+}

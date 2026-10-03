@@ -20,6 +20,6 @@ export type ProgressPlan = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'ccprogress': { plan: ProgressPlan | null; isExpanded: boolean; isWorking: boolean; tick: number }
+    'ccprogress': { plan: ProgressPlan | null; isExpanded: boolean; isWorking: boolean; tick: number; minuteTick: number }
   }
 }

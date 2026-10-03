@@ -1,9 +1,9 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, PluginOptions, Register, Timer } from 'claude-code'
+import type { EngineInterface, PluginOptions, Register, RenderSurface, Timer } from 'claude-code'
 
 import type { ProgressPlan, ProgressSource, ProgressStep } from '../types'
-import { formatDuration, hasSteps, isCjk, isStuck, stepElapsed, summarize, toSteps, withTiming } from './plan'
-import { checklist, overviewText, progressRow, reportLine, TERMINAL_INDENT, textSummary } from './view'
+import { formatDuration, formatMinutes, hasSteps, isCjk, isStuck, stepElapsed, summarize, toSteps, withTiming } from './plan'
+import { checklist, overviewText, phaseOf, progressRow, reportLine, TERMINAL_INDENT, textSummary } from './view'
 import type { Elapsed, SessionPlan } from './view'
 import { setLanguage, wordsFor } from './words'
 import type { Language } from './words'
@@ -22,8 +22,11 @@ const HUMAN_ORIGINS = ['composer', 'sdk', 'bridge']
 const plan = atom({ plugin: 'ccprogress', key: 'plan' } as const, null)
 const isExpanded = atom({ plugin: 'ccprogress', key: 'isExpanded' } as const, false)
 const isWorking = atom({ plugin: 'ccprogress', key: 'isWorking' } as const, false)
-// Wall time, written once a second while a turn runs; drawings that read it redraw with it.
+// Wall time for the timers: seconds for the terminal, whole minutes for the Desktop
+// app. Each is written only when its timer would read differently, since a write
+// redraws every reader and the Desktop app flashes on each redraw.
 const tick = atom({ plugin: 'ccprogress', key: 'tick' } as const, 0)
+const minuteTick = atom({ plugin: 'ccprogress', key: 'minuteTick' } as const, 0)
 
 type Config = { stuckMs: number; notify: 'toast' | 'system'; foldReports: boolean; language: Language }
 
@@ -170,11 +173,32 @@ async function sessionPlans($: EngineInterface, now: number): Promise<SessionPla
     .slice(0, OVERVIEW_LIMIT)
 }
 
+type Grain = 'second' | 'minute'
+
+// What a timer of this grain reads with its clock at `at`; undefined while it shows nothing.
+function timerAt(p: ProgressPlan, at: number, grain: Grain): Elapsed | undefined {
+  const now = Math.max(at, p.updatedAt)
+  const ms = stepElapsed(p, now)
+  if (ms === undefined) return undefined
+  const text = grain === 'second' ? formatDuration(ms) : formatMinutes(ms)
+  return text === undefined ? undefined : { text, isStuck: isStuck(p, now, config.stuckMs) }
+}
+
+function sameTimer(a: Elapsed | undefined, b: Elapsed | undefined): boolean {
+  return a?.text === b?.text && a?.isStuck === b?.isStuck
+}
+
 async function tickOnce($: EngineInterface) {
   const now = await $.clock.now()
-  await update($, tick, () => now)
   const p = await read($, plan)
-  if (!hasSteps(p) || !isStuck(p, now, config.stuckMs)) return
+  if (!hasSteps(p)) return
+  if (!sameTimer(timerAt(p, await read($, tick), 'second'), timerAt(p, now, 'second'))) {
+    await update($, tick, () => now)
+  }
+  if (!sameTimer(timerAt(p, await read($, minuteTick), 'minute'), timerAt(p, now, 'minute'))) {
+    await update($, minuteTick, () => now)
+  }
+  if (!isStuck(p, now, config.stuckMs)) return
   const key = `${p.stepKey}@${p.stepStartedAt}`
   if (key === alertedStep) return
   alertedStep = key
@@ -182,11 +206,11 @@ async function tickOnce($: EngineInterface) {
   await notify($, wordsFor(isCjk(p)).stuckToast(title, formatDuration(stepElapsed(p, now) ?? 0)))
 }
 
-async function elapsedOf($: EngineInterface, p: ProgressPlan): Promise<Elapsed | undefined> {
-  const now = Math.max(await read($, tick), p.updatedAt)
-  const ms = stepElapsed(p, now)
-  if (ms === undefined) return undefined
-  return { text: formatDuration(ms), isStuck: isStuck(p, now, config.stuckMs) }
+// Reads a clock only while the timer shows, so a finished or paused plan is not redrawn by it.
+async function elapsedOf($: EngineInterface, p: ProgressPlan, surface: RenderSurface, isWorking: boolean): Promise<Elapsed | undefined> {
+  if (phaseOf(p, isWorking) !== 'working') return undefined
+  if (surface === 'terminal') return timerAt(p, await read($, tick), 'second')
+  return timerAt(p, await read($, minuteTick), 'minute')
 }
 
 // The task list tools write one JSON file per task; reading them back is
@@ -369,7 +393,7 @@ export const register: Register = (on, options) => {
             surface: e.surface,
             columns: e.viewport?.columns,
             isWorking: true,
-            elapsed: await elapsedOf($, p),
+            elapsed: await elapsedOf($, p, e.surface, true),
           })}
         </Box>
         {theirs}
@@ -402,7 +426,7 @@ export const register: Register = (on, options) => {
         surface: e.surface,
         columns: e.props.bodyColumns,
         isWorking: e.props.isWorking,
-        elapsed: await elapsedOf($, p),
+        elapsed: await elapsedOf($, p, e.surface, e.props.isWorking),
       })
     )
     const dismiss =
@@ -467,7 +491,7 @@ export const register: Register = (on, options) => {
           surface: e.surface,
           columns: e.props.bodyColumns,
           isWorking: working,
-          elapsed: await elapsedOf($, p),
+          elapsed: await elapsedOf($, p, e.surface, working),
         })}
         {checklist(kit, e.surface, p, working)}
         <Button key="clear" label={words.clear} onPress={() => persist($, null)} />
