@@ -55,7 +55,7 @@ ccprogress is a [mod](https://code.claude.com/docs/en/plugins/mods/overview): a 
 
 1. The built-in `TodoWrite` tool, where the build offers it.
 2. The built-in task list (`TaskCreate` / `TaskUpdate`), read back from the task files under `~/.claude/tasks/` after each update.
-3. Its own `update_progress` tool otherwise, as in the current Desktop app. A short system prompt section asks Claude to report its plan for tasks of three or more steps and to update it as steps start and finish.
+3. Its own `update_progress` tool otherwise, as in the current Desktop app. A short system prompt section asks Claude to report its plan for tasks of three or more steps and to update it as steps start and finish. If a turn reaches four actions without a report, one short reminder is added for Claude to read; you never see it.
 
 **Where it draws.**
 
@@ -88,7 +88,7 @@ Change these in `/config`, or with `/plugin configure ccprogress@ccprogress`.
 - **Requirements**: Claude Code v2.1.287 or later, where mods are on by default. Run `claude --version` to check. Desktop app sessions under WSL do not load plugins.
 - **Subagents** cannot take over the bar; only the main conversation's plan is shown.
 - **Resume**: each session's plan is saved and comes back with `/resume`. Only the 50 most recent sessions are kept.
-- **Cost**: each update is one small tool call, a few hundred tokens per task. The system prompt section is about 80 words and is only added while the `update_progress` tool is offered.
+- **Cost**: each update is one small tool call, a few hundred tokens per task. The system prompt section is about 100 words and is only added while the `update_progress` tool is offered. The reminder adds about 25 words, at most once per turn.
 - **Privacy**: no network calls and no extra model calls. A process starts only in the `system` notification mode, to show the notification. Plans are kept in the plugin's store under `~/.claude/plugins/store/`, and files are read only under `~/.claude/tasks/`, only when the task list tools run.
 - **Trust**: a mod runs with your permissions. `claude plugin validate plugins/ccprogress` lists every event it hooks and every call it makes.
 - **Early access**: the mods API still changes between Claude Code releases.

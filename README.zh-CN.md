@@ -55,7 +55,7 @@ ccprogress 是一个 [mod](https://code.claude.com/docs/en/plugins/mods/overview
 
 1. 内置的 `TodoWrite` 工具（版本提供时）。
 2. 内置的任务列表（`TaskCreate` / `TaskUpdate`），每次更新后读回 `~/.claude/tasks/` 下的任务文件。
-3. 都没有时，用插件自带的 `update_progress` 工具，比如目前的 Desktop。插件会在系统提示里加一小段说明，请 Claude 在三步及以上的任务里上报计划，并在每一步开始和完成时更新。
+3. 都没有时，用插件自带的 `update_progress` 工具，比如目前的 Desktop。插件会在系统提示里加一小段说明，请 Claude 在三步及以上的任务里上报计划，并在每一步开始和完成时更新。如果一轮里已经做了 4 个动作还没上报，会追加一句只有 Claude 能看到的简短提醒，你看不到它。
 
 **画在哪里。**
 
@@ -88,7 +88,7 @@ ccprogress 是一个 [mod](https://code.claude.com/docs/en/plugins/mods/overview
 - **版本要求**：Claude Code v2.1.287 或更高，从这个版本起 mod 默认开启，可以用 `claude --version` 查看。Desktop 的 WSL 会话不加载插件。
 - **子代理**不会覆盖进度条，只显示主对话的计划。
 - **恢复会话**：每个会话的计划都会单独保存，`/resume` 后自动恢复，只保留最近 50 个会话。
-- **开销**：每次更新是一次很小的工具调用，一个任务大约多花几百 token。系统提示里那段说明约 80 个英文单词，只在 `update_progress` 工具可用时才会加上。
+- **开销**：每次更新是一次很小的工具调用，一个任务大约多花几百 token。系统提示里那段说明约 100 个英文单词，只在 `update_progress` 工具可用时才会加上。补报提醒约 25 个英文单词，每轮最多一次。
 - **隐私**：不联网，也不额外调用模型。只有在 `system` 通知模式下，才会启动进程来显示系统通知。计划保存在 `~/.claude/plugins/store/` 下的插件存储里；只在任务列表工具运行时读取 `~/.claude/tasks/` 下的文件。
 - **信任**：mod 以你的权限运行。`claude plugin validate plugins/ccprogress` 会列出它挂了哪些事件、调用了哪些 API。
 - **早期阶段**：mods API 仍在随 Claude Code 版本变化。
