@@ -15,6 +15,7 @@ export type Words = {
   thisSession: string
   allDoneOf: (total: number) => string
   ago: (ms: number) => string
+  usage: string
 }
 
 const EN: Words = {
@@ -34,6 +35,7 @@ const EN: Words = {
   thisSession: 'this session',
   allDoneOf: total => `all ${total} steps done`,
   ago: ms => (ms < 60_000 ? 'just now' : ms < 3_600_000 ? `${Math.floor(ms / 60_000)}m ago` : `${Math.floor(ms / 3_600_000)}h ago`),
+  usage: 'Usage: /progress shows the checklist, /progress all lists every session, /progress clear clears the plan.',
 }
 
 const ZH: Words = {
@@ -53,6 +55,7 @@ const ZH: Words = {
   thisSession: '当前会话',
   allDoneOf: total => `全部完成（${total} 步）`,
   ago: ms => (ms < 60_000 ? '刚刚' : ms < 3_600_000 ? `${Math.floor(ms / 60_000)} 分钟前` : `${Math.floor(ms / 3_600_000)} 小时前`),
+  usage: '用法：/progress 查看步骤清单，/progress all 查看所有会话，/progress clear 清空计划。',
 }
 
 export type Language = 'auto' | 'en' | 'zh'

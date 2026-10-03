@@ -307,14 +307,16 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'progress' }, async ($, e) => {
     const p = await read($, plan)
     const words = wordsFor(isCjk(p))
-    if (e.args.trim() === 'clear') {
+    const arg = e.args.trim()
+    if (arg === 'clear') {
       await persist($, null)
       return { text: words.cleared }
     }
-    if (e.args.trim() === 'all') {
+    if (arg === 'all') {
       const now = await $.clock.now()
       return { text: overviewText(await sessionPlans($, now), await $.session.id(), now) }
     }
+    if (arg !== '') return { text: words.usage }
     const surfaces = await $.session.surfaces()
     if (!surfaces.some(surface => surface === 'terminal' || surface === 'desktop')) {
       return { text: textSummary(p) }

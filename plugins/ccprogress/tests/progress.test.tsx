@@ -547,3 +547,17 @@ test('a plan records the working directory the session started in', async ($, on
   await $.tool.call({ tool: TOOL, steps: STEPS })
   expect(await overview($)).toContain('● ledger · 2/3 Write the fix · just now · this session')
 })
+
+test('an unknown /progress argument answers with the usage', async ($, on) => {
+  world(on)
+  await $.tool.call({ tool: TOOL, steps: STEPS })
+  const out = await $.command.run({
+    command: 'progress',
+    args: 'al',
+    origin: { kind: 'composer' },
+    presentation: { isFullscreen: true, columns: 120 },
+  })
+  expect(out.text).toBe('Usage: /progress shows the checklist, /progress all lists every session, /progress clear clears the plan.')
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'Spinner', props: SPINNER })
+  expect(await ui.find({ type: 'Text', text: 'Write the fix' })).toBeDefined()
+})
