@@ -28,6 +28,12 @@
 在 **Desktop** 里，进度条在整个执行过程中都显示在输入框上方。点 **查看步骤** 会原地展开清单；计划完成后可以点关闭，或者在你发下一条消息时自动清除。
 
 <p align="center">
+  <img src="./assets/readme/live-terminal.png" width="100%" alt="真实的终端会话：一次进度上报折叠成一行灰色的 4/6 Write unit tests，spinner 上方的进度条前三步为绿色，第四步为橙色，并显示已用时 2 秒">
+</p>
+
+<p align="center"><sub>真实的终端会话：第 4/6 步已执行 2 秒，这一步的上报折叠成了一行。</sub></p>
+
+<p align="center">
   <img src="./assets/readme/terminal.svg" width="100%" alt="在终端里，一条连续的进度条紧贴在 spinner 上方，每次上报进度在 transcript 里只占一行灰色摘要">
 </p>
 

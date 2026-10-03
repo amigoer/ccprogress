@@ -28,6 +28,12 @@ In a long session the spinner only tells you how long Claude has been working an
 In the **Desktop app** the bar lives in the band above the prompt for the whole turn. **View steps** unfolds the checklist in place, and a finished plan can be dismissed or simply clears when you send your next prompt.
 
 <p align="center">
+  <img src="./assets/readme/live-terminal.png" width="100%" alt="A real terminal session: a progress report folded into the dim line 4/6 Write unit tests, and above the spinner a bar with three steps done in green, the fourth running in orange with a two-second timer">
+</p>
+
+<p align="center"><sub>From a real terminal session: step 4 of 6 has been running for 2 seconds, and its report is folded into one line.</sub></p>
+
+<p align="center">
   <img src="./assets/readme/terminal.svg" width="100%" alt="In the terminal a continuous progress bar sits right above the spinner, and each progress report folds into one dim line in the transcript">
 </p>
 
