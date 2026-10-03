@@ -60,7 +60,6 @@ function bar(kit: Kit, surface: RenderSurface, plan: ProgressPlan, columns: numb
       <Svg
         source={barSvg(plan.steps, width, PALETTE, isWorking)}
         alt={`${s.done} of ${s.total} steps done`}
-        width={width}
         height={4}
         isInteractive={isWorking}
       />
@@ -90,6 +89,9 @@ export type RowOptions = {
 
 // The terminal lines it up with the spinner's text, the spinner's glyph being two cells.
 export const TERMINAL_INDENT = 2
+
+// How much faster the goal gives up room than the bar when the Desktop band is narrow.
+const GOAL_SHRINK = 100
 
 // Desktop: what is happening on the left, how far along on the right. Terminal:
 // one left-aligned line, bar first, as a terminal progress bar reads.
@@ -130,21 +132,38 @@ export function progressRow(kit: Kit, plan: ProgressPlan, { surface, columns, is
       </Box>
     )
   }
+  // A narrow band gives up the goal first, then squeezes the bar and truncates the step;
+  // "All done", the count and the buttons beside the row keep their room. The row clips
+  // rather than painting over the buttons.
   return (
-    <Box key="progress-row" flexDirection="row" alignItems="center" columnGap={2} flexGrow={1} flexShrink={1}>
-      <Box flexDirection="row" alignItems="center" columnGap={1} flexGrow={1} flexShrink={1}>
+    <Box key="progress-row" flexDirection="row" alignItems="center" columnGap={2} flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
+      <Box flexDirection="row" alignItems="center" columnGap={1} flexGrow={1} flexShrink={1} minWidth={0}>
         {phaseIcon(kit, phase)}
-        <Text wrap="truncate-end">{phase === 'done' ? words.allDone : (s.current?.title ?? '')}</Text>
-        {timer}
+        {phase === 'done' ? (
+          <Box key="label" flexShrink={0}>
+            <Text>{words.allDone}</Text>
+          </Box>
+        ) : (
+          <Box key="label" flexShrink={1} minWidth={0}>
+            <Text wrap="truncate-end">{s.current?.title ?? ''}</Text>
+          </Box>
+        )}
+        {timer && <Box flexShrink={0}>{timer}</Box>}
         {phase === 'done' && plan.goal !== '' && (
-          <Text dimColor wrap="truncate-end">
-            {plan.goal}
-          </Text>
+          <Box key="goal" flexShrink={GOAL_SHRINK} minWidth={0}>
+            <Text dimColor wrap="truncate-end">
+              {plan.goal}
+            </Text>
+          </Box>
         )}
       </Box>
-      <Box flexDirection="row" alignItems="center" columnGap={1} flexShrink={0}>
-        {bar(kit, surface, plan, columns, phase === 'working')}
-        {count}
+      <Box flexDirection="row" alignItems="center" columnGap={1} flexShrink={1} minWidth={0}>
+        <Box key="bar" flexShrink={1} minWidth={0}>
+          {bar(kit, surface, plan, columns, phase === 'working')}
+        </Box>
+        <Box key="count" flexShrink={0}>
+          {count}
+        </Box>
       </Box>
     </Box>
   )

@@ -48,7 +48,8 @@ export function svgWidth(total: number): number {
   return Math.max(72, Math.min(132, total * 22))
 }
 
-// Desktop bar: one segment per step; the running one breathes while a turn runs.
+// Desktop bar: one segment per step; the running one breathes while a turn runs. It
+// stretches to the box it is drawn in, so a narrow band can squeeze it.
 export function barSvg(steps: readonly ProgressStep[], width: number, palette: Palette, isAnimated = false): string {
   const n = steps.length
   const height = 4
@@ -77,5 +78,5 @@ export function barSvg(steps: readonly ProgressStep[], width: number, palette: P
       (running > 0 ? current(`width="${(done + running).toFixed(2)}" height="${height}" rx="${radius}"`) : '') +
       (done > 0 ? `<rect width="${done.toFixed(2)}" height="${height}" rx="${radius}" fill="${palette.done}"/>` : '')
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${shapes}</svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">${shapes}</svg>`
 }
