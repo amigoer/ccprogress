@@ -65,6 +65,8 @@ ccprogress 是一个 [mod](https://code.claude.com/docs/en/plugins/mods/overview
 
 **颜色。** 绿色是已完成，橙色是进行中，灰色是还没开始。
 
+**计时与提醒。** Claude 干活时，当前步骤会显示已经用了多久。超过 5 分钟计时变红，并弹出提示说这一步可能卡住了，常见原因是有个权限确认没人点。全部步骤完成时，也会弹出提示并附上总用时。
+
 ## 命令
 
 | 命令 | 作用 |
@@ -72,13 +74,22 @@ ccprogress 是一个 [mod](https://code.claude.com/docs/en/plugins/mods/overview
 | `/progress` | 查看完整步骤清单：终端里打开侧边面板，Desktop 里展开进度栏。Claude 干活时也能用。 |
 | `/progress clear` | 清空当前计划。 |
 
+## 配置
+
+在 `/config` 里修改，或者执行 `/plugin configure ccprogress@ccprogress`。
+
+| 配置项 | 默认值 | 作用 |
+| --- | --- | --- |
+| `stuck_minutes` | `5` | 当前步骤用时超过这么多分钟就提醒。设为 `0` 关闭提醒。 |
+| `notify` | `toast` | `toast` 只在会话内提醒；`system` 额外发系统通知，macOS 用 `osascript`，Linux 用 `notify-send`。 |
+
 ## 须知
 
 - **版本要求**：Claude Code v2.1.287 或更高，从这个版本起 mod 默认开启，可以用 `claude --version` 查看。Desktop 的 WSL 会话不加载插件。
 - **子代理**不会覆盖进度条，只显示主对话的计划。
 - **恢复会话**：每个会话的计划都会单独保存，`/resume` 后自动恢复，只保留最近 50 个会话。
 - **开销**：每次更新是一次很小的工具调用，一个任务大约多花几百 token。系统提示里那段说明约 80 个英文单词，只在 `update_progress` 工具可用时才会加上。
-- **隐私**：不联网，也不额外调用模型。计划保存在 `~/.claude/plugins/store/` 下的插件存储里；只在任务列表工具运行时读取 `~/.claude/tasks/` 下的文件。
+- **隐私**：不联网，也不额外调用模型。只有在 `system` 通知模式下，才会启动进程来显示系统通知。计划保存在 `~/.claude/plugins/store/` 下的插件存储里；只在任务列表工具运行时读取 `~/.claude/tasks/` 下的文件。
 - **信任**：mod 以你的权限运行。`claude plugin validate plugins/ccprogress` 会列出它挂了哪些事件、调用了哪些 API。
 - **早期阶段**：mods API 仍在随 Claude Code 版本变化。
 

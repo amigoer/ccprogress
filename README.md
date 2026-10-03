@@ -65,6 +65,8 @@ ccprogress is a [mod](https://code.claude.com/docs/en/plugins/mods/overview): a 
 
 **Colors.** Green is done, orange is the step under way, gray is still to come.
 
+**Timers and alerts.** While Claude works, the running step shows how long it has taken. Past 5 minutes the timer turns red and a toast says the step may be stuck, which is often a permission prompt nobody has answered. When every step is done, a toast says so with the total time.
+
 ## Commands
 
 | Command | What it does |
@@ -72,13 +74,22 @@ ccprogress is a [mod](https://code.claude.com/docs/en/plugins/mods/overview): a 
 | `/progress` | Shows the full checklist: a side pane in the terminal, the unfolded band in the Desktop app. Works while Claude is busy. |
 | `/progress clear` | Clears the current plan. |
 
+## Settings
+
+Change these in `/config`, or with `/plugin configure ccprogress@ccprogress`.
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `stuck_minutes` | `5` | Warns when the running step has taken this long. `0` turns the alert off. |
+| `notify` | `toast` | `toast` alerts inside the session only. `system` also sends a desktop notification, through `osascript` on macOS or `notify-send` on Linux. |
+
 ## Good to know
 
 - **Requirements**: Claude Code v2.1.287 or later, where mods are on by default. Run `claude --version` to check. Desktop app sessions under WSL do not load plugins.
 - **Subagents** cannot take over the bar; only the main conversation's plan is shown.
 - **Resume**: each session's plan is saved and comes back with `/resume`. Only the 50 most recent sessions are kept.
 - **Cost**: each update is one small tool call, a few hundred tokens per task. The system prompt section is about 80 words and is only added while the `update_progress` tool is offered.
-- **Privacy**: no network calls and no extra model calls. Plans are kept in the plugin's store under `~/.claude/plugins/store/`, and files are read only under `~/.claude/tasks/`, only when the task list tools run.
+- **Privacy**: no network calls and no extra model calls. A process starts only in the `system` notification mode, to show the notification. Plans are kept in the plugin's store under `~/.claude/plugins/store/`, and files are read only under `~/.claude/tasks/`, only when the task list tools run.
 - **Trust**: a mod runs with your permissions. `claude plugin validate plugins/ccprogress` lists every event it hooks and every call it makes.
 - **Early access**: the mods API still changes between Claude Code releases.
 
