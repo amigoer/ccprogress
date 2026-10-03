@@ -5,7 +5,8 @@ import type { ProgressPlan, ProgressSource, ProgressStep } from '../types'
 import { formatDuration, hasSteps, isCjk, isStuck, stepElapsed, summarize, toSteps, withTiming } from './plan'
 import { checklist, progressRow, reportLine, TERMINAL_INDENT, textSummary } from './view'
 import type { Elapsed } from './view'
-import { wordsFor } from './words'
+import { setLanguage, wordsFor } from './words'
+import type { Language } from './words'
 
 const PANE = 'ccprogress'
 const TOOL_NAME = 'update_progress'
@@ -22,9 +23,9 @@ const isWorking = atom({ plugin: 'ccprogress', key: 'isWorking' } as const, fals
 // Wall time, written once a second while a turn runs; drawings that read it redraw with it.
 const tick = atom({ plugin: 'ccprogress', key: 'tick' } as const, 0)
 
-type Config = { stuckMs: number; notify: 'toast' | 'system' }
+type Config = { stuckMs: number; notify: 'toast' | 'system'; foldReports: boolean; language: Language }
 
-let config: Config = { stuckMs: 5 * 60_000, notify: 'toast' }
+let config: Config = { stuckMs: 5 * 60_000, notify: 'toast', foldReports: true, language: 'auto' }
 let ticker: Timer | undefined
 // The step already warned about, so one stuck step raises one alert.
 let alertedStep: string | undefined
@@ -38,6 +39,8 @@ function configFrom(options: PluginOptions): Config {
   return {
     stuckMs: Number.isFinite(minutes) && minutes > 0 ? minutes * 60_000 : 0,
     notify: options.notify === 'system' ? 'system' : 'toast',
+    foldReports: options.fold_reports !== false,
+    language: options.language === 'en' || options.language === 'zh' ? options.language : 'auto',
   }
 }
 
@@ -200,6 +203,7 @@ async function readTaskList($: EngineInterface): Promise<ProgressStep[] | null> 
 
 export const register: Register = (on, options) => {
   config = configFrom(options)
+  setLanguage(config.language)
 
   on('session.start', async ($, e, next) => {
     const tools = await $.tool.list()
@@ -409,7 +413,7 @@ export const register: Register = (on, options) => {
   // drop its result. Errors keep the engine's row, and the Desktop app folds tool
   // rows on its own.
   on('ui.render', { component: 'ToolUse', props: { tool: TOOL } }, async ($, e, next) => {
-    if (e.surface !== 'terminal' || e.props.isErrored || e.props.isInterrupted) return next(e)
+    if (!config.foldReports || e.surface !== 'terminal' || e.props.isErrored || e.props.isInterrupted) return next(e)
     const steps = toSteps((e.props.input as { steps?: unknown } | undefined)?.steps)
     if (steps.length === 0) return next(e)
     const goal = (e.props.input as { goal?: unknown }).goal
@@ -419,7 +423,7 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'ToolResult', props: { tool: TOOL } }, async ($, e, next) => {
-    if (e.surface !== 'terminal' || e.props.isErrored) return next(e)
+    if (!config.foldReports || e.surface !== 'terminal' || e.props.isErrored) return next(e)
     const { Box } = $.ui.resolve(e)
     return <Box />
   })

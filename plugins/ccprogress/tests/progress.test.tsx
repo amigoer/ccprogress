@@ -455,3 +455,30 @@ test('subagent actions do not count toward the reminder', async ($, on) => {
   const seen = await reminders($, 6, 'sub-1')
   expect(seen.every(context => context === undefined)).toBe(true)
 })
+
+test('fold_reports off keeps the engine rows for progress reports', { options: { fold_reports: false } }, async ($, on) => {
+  world(on)
+  const row = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'ToolUse', props: toolRow({ steps: STEPS }) })
+  expect(await row.find({ type: 'Text', text: 'engine' })).toBeDefined()
+  expect(await row.find({ type: 'Text', text: /◦/ })).toBeUndefined()
+})
+
+test('language zh labels an English plan in Chinese', { options: { language: 'zh' } }, async ($, on) => {
+  world(on)
+  await $.tool.call({ tool: TOOL, goal: 'Fix login bug', steps: STEPS })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'AbovePrompt', props: band(false) })
+  expect(await ui.find({ type: 'Button', key: 'toggle' })).toMatchObject({ text: '查看步骤 ▾' })
+})
+
+test('language en labels a Chinese plan in English', { options: { language: 'en' } }, async ($, on) => {
+  world(on)
+  await $.tool.call({
+    tool: TOOL,
+    steps: [
+      { title: '阅读代码', status: 'completed' },
+      { title: '编写修复', status: 'in_progress' },
+    ],
+  })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'AbovePrompt', props: band(false) })
+  expect(await ui.find({ type: 'Button', key: 'toggle' })).toMatchObject({ text: 'View steps ▾' })
+})

@@ -40,7 +40,19 @@ const ZH: Words = {
   stuckToast: (title, duration) => `「${title}」已经进行了 ${duration}，可能卡住了`,
 }
 
-// The plan's own language decides; it is what the person and Claude are speaking.
+export type Language = 'auto' | 'en' | 'zh'
+
+let preferred: Language = 'auto'
+
+// Set once per load from the plugin's options.
+export function setLanguage(language: Language) {
+  preferred = language
+}
+
+// A language the person picked wins; otherwise the plan's own language decides,
+// since it is what the person and Claude are speaking.
 export function wordsFor(isCjk: boolean): Words {
+  if (preferred === 'en') return EN
+  if (preferred === 'zh') return ZH
   return isCjk ? ZH : EN
 }

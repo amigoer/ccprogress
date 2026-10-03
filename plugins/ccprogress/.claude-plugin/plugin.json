@@ -1,6 +1,6 @@
 {
   "name": "ccprogress",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A progress bar of the current task above the spinner, in the terminal and the Desktop app",
   "author": {
     "name": "amigoer"
@@ -34,6 +34,23 @@
         "system"
       ],
       "default": "toast"
+    },
+    "fold_reports": {
+      "type": "boolean",
+      "title": "Fold progress reports",
+      "description": "In the terminal, show each progress report as one dim line instead of the whole step list.",
+      "default": true
+    },
+    "language": {
+      "type": "string",
+      "title": "Label language",
+      "description": "Language of the bar's labels. auto follows the language of the steps.",
+      "options": [
+        "auto",
+        "en",
+        "zh"
+      ],
+      "default": "auto"
     }
   }
 }
