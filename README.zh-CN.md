@@ -54,7 +54,7 @@ ccprogress 是一个 [mod](https://code.claude.com/docs/en/plugins/mods/overview
 **步骤从哪来。** 进度条得有人告诉它有哪些步骤，ccprogress 按顺序使用当前会话里第一个可用的来源：
 
 1. 内置的 `TodoWrite` 工具（版本提供时）。
-2. 内置的任务列表（`TaskCreate` / `TaskUpdate`），每次更新后读回 `~/.claude/tasks/` 下的任务文件。
+2. 内置的任务列表（`TaskCreate` / `TaskUpdate`），每次更新后读回 `~/.claude/tasks/` 下的任务文件。当前版本通过设置 `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` 开启这些工具，ccprogress 已经在真实会话里和它们对过一遍。
 3. 都没有时，用插件自带的 `update_progress` 工具，比如目前的 Desktop。插件会在系统提示里加一小段说明，请 Claude 在三步及以上的任务里上报计划，并在每一步开始和完成时更新。如果一轮里已经做了 4 个动作还没上报，会追加一句只有 Claude 能看到的简短提醒，你看不到它。
 
 **画在哪里。**

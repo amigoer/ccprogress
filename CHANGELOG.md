@@ -9,6 +9,14 @@ Notable changes to ccprogress. Pull requests add their entry under **Unreleased*
 - `/progress all` lists the plans of every session on this machine from the last 24 hours, with each one's current step and when it last moved. ([#3](https://github.com/amigoer/ccprogress/issues/3))
 - Saved plans record the session's working directory, so the overview can name the project.
 
+### Fixed
+
+- An unknown `/progress` argument answers with the usage instead of opening the checklist.
+
+### Verified
+
+- Following the built-in task list tools, turned on with `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`, checked in a real session: steps, statuses and order match the task files. ([#5](https://github.com/amigoer/ccprogress/issues/5))
+
 ## 0.4.0 - 2026-10-03
 
 ### Added

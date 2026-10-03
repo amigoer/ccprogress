@@ -54,7 +54,7 @@ ccprogress is a [mod](https://code.claude.com/docs/en/plugins/mods/overview): a 
 **Where the steps come from.** The bar needs someone to name the steps, so ccprogress uses the first source the session has:
 
 1. The built-in `TodoWrite` tool, where the build offers it.
-2. The built-in task list (`TaskCreate` / `TaskUpdate`), read back from the task files under `~/.claude/tasks/` after each update.
+2. The built-in task list (`TaskCreate` / `TaskUpdate`), read back from the task files under `~/.claude/tasks/` after each update. Current builds turn these tools on with `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`; ccprogress has been checked against them in a real session.
 3. Its own `update_progress` tool otherwise, as in the current Desktop app. A short system prompt section asks Claude to report its plan for tasks of three or more steps and to update it as steps start and finish. If a turn reaches four actions without a report, one short reminder is added for Claude to read; you never see it.
 
 **Where it draws.**
