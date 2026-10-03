@@ -1,6 +1,6 @@
 {
   "name": "ccprogress",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "A progress bar of the current task above the spinner, in the terminal and the Desktop app",
   "author": {
     "name": "amigoer"
