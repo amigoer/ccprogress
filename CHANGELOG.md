@@ -4,6 +4,10 @@ Notable changes to ccprogress. Pull requests add their entry under **Unreleased*
 
 ## Unreleased
 
+### Fixed
+
+- In a narrow Desktop window, such as with a pane docked beside the chat, the band no longer cuts "All done" short or draws the bar and step count under its buttons. The goal gives way first, then the bar narrows; the label, the count and the buttons keep their room.
+
 ## 0.5.1 - 2026-10-03
 
 ### Fixed

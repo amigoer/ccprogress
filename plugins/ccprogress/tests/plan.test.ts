@@ -99,6 +99,7 @@ describe('bar', () => {
     expect(still).toContain('fill="#0f0"/>')
     expect(still).toContain('fill="#f00" fill-opacity="0.55"/>')
     expect(still).not.toContain('<animate')
+    expect(still).toContain('preserveAspectRatio="none"')
     expect(barSvg(steps, 90, PALETTE, true)).toContain('<animate attributeName="fill-opacity"')
   })
 })

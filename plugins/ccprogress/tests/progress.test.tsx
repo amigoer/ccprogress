@@ -125,6 +125,28 @@ test('the band shows the bar while idle, and on desktop while working too', asyn
   expect(svgs.length).toBe(2)
 })
 
+test('a narrow Desktop band gives way in the goal and the bar, never over the buttons', async ($, on) => {
+  world(on)
+  const eleven = Array.from({ length: 11 }, (_, i) => ({ title: `Step ${i + 1}`, status: 'completed' }))
+  await $.tool.call({ tool: TOOL, goal: 'Explore the iOS client with Liquid Glass and motion', steps: eleven })
+  const done = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'AbovePrompt', props: band(false) })
+
+  expect(await done.find({ key: 'progress-row' })).toMatchObject({ props: { minWidth: 0, overflow: 'hidden' } })
+  expect(await done.find({ key: 'label' })).toMatchObject({ props: { flexShrink: 0 } })
+  expect(await done.find({ key: 'count' })).toMatchObject({ props: { flexShrink: 0 } })
+  expect(await done.find({ key: 'bar' })).toMatchObject({ props: { flexShrink: 1, minWidth: 0 } })
+  const goal = (await done.find({ key: 'goal' }))?.props as { flexShrink?: number; minWidth?: number } | undefined
+  expect(goal?.minWidth).toBe(0)
+  expect(goal?.flexShrink ?? 0).toBeGreaterThan(1)
+  const bar = (await done.findAll({ type: 'Svg' })).find(svg => (svg.props as { height?: number }).height === 4)
+  expect((bar?.props as { width?: number } | undefined)?.width).toBeUndefined()
+  await done.unmount()
+
+  await $.tool.call({ tool: TOOL, goal: 'Fix login bug', steps: STEPS })
+  const working = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'AbovePrompt', props: band(true) })
+  expect(await working.find({ key: 'label' })).toMatchObject({ props: { flexShrink: 1, minWidth: 0 } })
+})
+
 test('view steps unfolds the checklist in the band', async ($, on) => {
   world(on)
   await $.tool.call({ tool: TOOL, goal: 'Fix login bug', steps: STEPS })
