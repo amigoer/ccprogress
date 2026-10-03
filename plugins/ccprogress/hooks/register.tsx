@@ -3,8 +3,8 @@ import type { EngineInterface, PluginOptions, Register, Timer } from 'claude-cod
 
 import type { ProgressPlan, ProgressSource, ProgressStep } from '../types'
 import { formatDuration, hasSteps, isCjk, isStuck, stepElapsed, summarize, toSteps, withTiming } from './plan'
-import { checklist, progressRow, reportLine, TERMINAL_INDENT, textSummary } from './view'
-import type { Elapsed } from './view'
+import { checklist, overviewText, progressRow, reportLine, TERMINAL_INDENT, textSummary } from './view'
+import type { Elapsed, SessionPlan } from './view'
 import { setLanguage, wordsFor } from './words'
 import type { Language } from './words'
 
@@ -12,6 +12,8 @@ const PANE = 'ccprogress'
 const TOOL_NAME = 'update_progress'
 const TOOL = 'mcp__ccprogress__update_progress'
 const KEEP_SESSIONS = 50
+const OVERVIEW_WINDOW_MS = 24 * 3_600_000
+const OVERVIEW_LIMIT = 10
 const BUILTIN_LISTS = ['TodoWrite', 'TaskCreate']
 const TASK_TOOLS = ['TaskCreate', 'TaskUpdate']
 // The terminal's Enter, the Desktop app (an SDK host) and Remote Control.
@@ -33,6 +35,8 @@ let alertedStep: string | undefined
 let callsThisTurn = 0
 let reportedThisTurn = false
 let nudgedThisTurn = false
+// Recorded with each plan so other sessions' overviews can name the project.
+let sessionCwd: string | undefined
 
 function configFrom(options: PluginOptions): Config {
   const minutes = Number(options.stuck_minutes ?? 5)
@@ -142,7 +146,11 @@ async function adopt($: EngineInterface, steps: ProgressStep[], source: Progress
   if (steps.length === 0) return persist($, null)
   const previous = await read($, plan)
   const now = await $.clock.now()
-  const next = withTiming({ goal: goal ?? previous?.goal ?? '', steps, source, updatedAt: now }, previous, now)
+  const next = withTiming(
+    { goal: goal ?? previous?.goal ?? '', steps, source, updatedAt: now, ...(sessionCwd ? { cwd: sessionCwd } : {}) },
+    previous,
+    now,
+  )
   await persist($, next)
   const s = summarize(next)
   const wasComplete = previous !== null && summarize(previous).isComplete
@@ -150,6 +158,16 @@ async function adopt($: EngineInterface, steps: ProgressStep[], source: Progress
     const words = wordsFor(isCjk(next))
     await notify($, words.doneToast(s.total, next.goal, formatDuration(now - (next.startedAt ?? now))))
   }
+}
+
+// Every session shares the plugin's store, so its plan keys cover the whole machine.
+async function sessionPlans($: EngineInterface, now: number): Promise<SessionPlan[]> {
+  const keys = (await $.store.keys()).filter(key => key.startsWith('plan:'))
+  const entries = await Promise.all(keys.map(async key => ({ id: key.slice(5), plan: await $.store.get(key) })))
+  return entries
+    .filter((entry): entry is SessionPlan => isPlan(entry.plan) && hasSteps(entry.plan) && now - entry.plan.updatedAt <= OVERVIEW_WINDOW_MS)
+    .sort((a, b) => b.plan.updatedAt - a.plan.updatedAt)
+    .slice(0, OVERVIEW_LIMIT)
 }
 
 async function tickOnce($: EngineInterface) {
@@ -206,6 +224,7 @@ export const register: Register = (on, options) => {
   setLanguage(config.language)
 
   on('session.start', async ($, e, next) => {
+    sessionCwd = e.cwd
     const tools = await $.tool.list()
     if (!tools.some(tool => BUILTIN_LISTS.includes(tool.name))) {
       await $.tool.register({ name: TOOL_NAME, description: TOOL_DESCRIPTION, inputSchema: INPUT_SCHEMA })
@@ -213,7 +232,7 @@ export const register: Register = (on, options) => {
     await $.command.register({
       name: 'progress',
       description: 'Show the current task progress',
-      argumentHint: '[clear]',
+      argumentHint: '[all|clear]',
       immediate: true,
     })
     await restore($, await $.session.id())
@@ -291,6 +310,10 @@ export const register: Register = (on, options) => {
     if (e.args.trim() === 'clear') {
       await persist($, null)
       return { text: words.cleared }
+    }
+    if (e.args.trim() === 'all') {
+      const now = await $.clock.now()
+      return { text: overviewText(await sessionPlans($, now), await $.session.id(), now) }
     }
     const surfaces = await $.session.surfaces()
     if (!surfaces.some(surface => surface === 'terminal' || surface === 'desktop')) {

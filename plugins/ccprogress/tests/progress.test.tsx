@@ -482,3 +482,68 @@ test('language en labels a Chinese plan in English', { options: { language: 'en'
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'AbovePrompt', props: band(false) })
   expect(await ui.find({ type: 'Button', key: 'toggle' })).toMatchObject({ text: 'View steps ▾' })
 })
+
+const NOW = 100 * 3_600_000
+
+function seeded(on: On, entries: Record<string, unknown>) {
+  mock.clock(on, { now: NOW })
+  mock.store(on, entries)
+  on('session.id', () => ({ value: 'session-1' }))
+}
+
+async function overview($: Engine): Promise<string | undefined> {
+  const out = await $.command.run({
+    command: 'progress',
+    args: 'all',
+    origin: { kind: 'composer' },
+    presentation: { isFullscreen: true, columns: 120 },
+  })
+  return out.text
+}
+
+const saved = (steps: unknown, updatedAt: number, cwd?: string) => ({
+  goal: '',
+  steps,
+  source: 'tool',
+  updatedAt,
+  ...(cwd ? { cwd } : {}),
+})
+
+test('/progress all lists recent sessions, newest first, and marks this one', async ($, on) => {
+  seeded(on, {
+    'plan:session-1': saved(STEPS, NOW - 10_000, '/work/ccprogress'),
+    'plan:aaaa1111-0000': saved(STEPS, NOW - 120_000, '/work/ledger'),
+    'plan:bbbb2222-0000': saved(DONE, NOW - 2 * 3_600_000),
+    'plan:cccc3333-0000': saved(STEPS, NOW - 30 * 3_600_000, '/work/old'),
+    'other-key': 1,
+  })
+  expect(await overview($)).toBe(
+    [
+      '3 sessions with a plan in the last 24 hours:',
+      '● ccprogress · 2/3 Write the fix · just now · this session',
+      '● ledger · 2/3 Write the fix · 2m ago',
+      '✓ bbbb2222 · all 3 steps done · 2h ago',
+    ].join('\n'),
+  )
+})
+
+test('/progress all says so when no session reported a plan', async ($, on) => {
+  seeded(on, { 'plan:old-0000': saved(STEPS, NOW - 48 * 3_600_000) })
+  expect(await overview($)).toBe('No session reported a plan in the last 24 hours.')
+})
+
+test('/progress all speaks Chinese for Chinese plans', async ($, on) => {
+  seeded(on, { 'plan:aaaa1111-0000': saved([{ title: '跑测试', status: 'in_progress' }], NOW - 5 * 60_000, '/work/ledger') })
+  expect(await overview($)).toBe(['最近 24 小时有 1 个会话上报了计划：', '● ledger · 1/1 跑测试 · 5 分钟前'].join('\n'))
+})
+
+test('a plan records the working directory the session started in', async ($, on) => {
+  seeded(on, {})
+  on('tool.list', () => ({ value: [] }))
+  on('tool.register', () => ({ value: { tool: TOOL } }))
+  on('command.register', () => ({ value: { command: 'progress' } }))
+  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  await $.session.start({ cwd: '/Users/me/work/ledger', surface: 'terminal', isInteractive: true })
+  await $.tool.call({ tool: TOOL, steps: STEPS })
+  expect(await overview($)).toContain('● ledger · 2/3 Write the fix · just now · this session')
+})

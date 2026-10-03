@@ -176,6 +176,23 @@ export function reportLine(plan: ProgressPlan): string {
   return `${s.position}/${s.total} ${s.current?.title ?? ''}`
 }
 
+export type SessionPlan = { id: string; plan: ProgressPlan }
+
+// One line per session: where it runs, how far it got, and when it last moved.
+export function overviewText(sessions: readonly SessionPlan[], currentId: string, now: number): string {
+  const words = wordsFor(sessions.some(session => isCjk(session.plan)))
+  if (sessions.length === 0) return words.overviewEmpty
+  const lines = sessions.map(({ id, plan }) => {
+    const s = summarize(plan)
+    const name = plan.cwd ? (plan.cwd.split(/[\\/]/).filter(Boolean).pop() ?? plan.cwd) : id.slice(0, 8)
+    const where = s.isComplete ? words.allDoneOf(s.total) : `${s.position}/${s.total} ${s.current?.title ?? ''}`
+    const parts = [`${s.isComplete ? '✓' : '●'} ${name}`, where, words.ago(Math.max(0, now - plan.updatedAt))]
+    if (id === currentId) parts.push(words.thisSession)
+    return parts.join(' · ')
+  })
+  return [words.overviewTitle(sessions.length), ...lines].join('\n')
+}
+
 export function textSummary(plan: ProgressPlan | null): string {
   const words = wordsFor(isCjk(plan))
   if (plan === null || plan.steps.length === 0) return words.empty

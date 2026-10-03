@@ -14,6 +14,8 @@ export type ProgressPlan = {
   // Which step is running (`<position>:<title>`) and since when.
   stepKey?: string
   stepStartedAt?: number
+  // The session's working directory, so an overview can name the project.
+  cwd?: string
 }
 
 declare module 'claude-code' {
