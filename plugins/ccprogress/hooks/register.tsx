@@ -28,6 +28,10 @@ let config: Config = { stuckMs: 5 * 60_000, notify: 'toast' }
 let ticker: Timer | undefined
 // The step already warned about, so one stuck step raises one alert.
 let alertedStep: string | undefined
+// Main-loop actions in the running turn, and whether it reported or was reminded.
+let callsThisTurn = 0
+let reportedThisTurn = false
+let nudgedThisTurn = false
 
 function configFrom(options: PluginOptions): Config {
   const minutes = Number(options.stuck_minutes ?? 5)
@@ -38,20 +42,28 @@ function configFrom(options: PluginOptions): Config {
 }
 
 const TOOL_DESCRIPTION = [
-  'Show the user a live progress bar for the current task.',
-  'Call it before starting any task that takes three or more distinct steps, listing every step,',
-  'then again each time a step starts or finishes, always sending the whole list.',
-  'Keep exactly one step in_progress while work is under way. Do not use it for single-step requests or questions.',
+  'Show the user a live progress bar for the current task; without it they only see elapsed time and tokens.',
+  'Call it as soon as you know a task takes three or more steps (editing several files, running and fixing',
+  'tests, a request with several parts), before the first step, listing every step.',
+  'Call it again whenever a step starts or finishes, always sending the whole list with exactly one step',
+  'in_progress, and once more when every step is done. If you notice midway that a task has several steps,',
+  'call it then. Skip it for single-step requests and plain questions.',
 ].join(' ')
 
 const GUIDE = [
   '# Progress reporting',
-  `The user follows long tasks through a progress bar fed by the ${TOOL} tool.`,
-  'When a task takes three or more distinct steps, call it before the first step with every step listed,',
-  'and again whenever a step starts or finishes, sending the full list with exactly one step in_progress.',
+  `The user follows long tasks through a progress bar fed by the ${TOOL} tool; it is all they see of your plan.`,
+  'When a task takes three or more steps, call it before the first step with every step listed, even when the',
+  'request did not spell the steps out. Call it again whenever a step starts or finishes, sending the full',
+  'list with exactly one step in_progress, and once more when all steps are done.',
   "Write step titles as short verb phrases (under eight words) in the user's language.",
   'Revise the list when the plan changes. Skip it for one-step requests and plain questions.',
 ].join('\n')
+
+// A turn this many actions deep without a report gets one reminder the model reads.
+const NUDGE_AFTER_CALLS = 4
+const NUDGE_NEW = `This task has already taken several actions. If more steps remain, call ${TOOL} with the full plan so the user can follow along.`
+const NUDGE_STALE = `The progress bar still shows an unfinished plan. Call ${TOOL} to mark the finished steps and the step under way, or to report a new plan.`
 
 const INPUT_SCHEMA = {
   type: 'object',
@@ -238,23 +250,35 @@ export const register: Register = (on, options) => {
       return { result: 'Noted. Only the main conversation plan is shown to the user.' }
     }
     const goal = typeof input.goal === 'string' && input.goal.trim() !== '' ? input.goal.trim() : undefined
+    reportedThisTurn = true
     await adopt($, steps, 'tool', goal)
     const s = summarize({ goal: '', steps, source: 'tool', updatedAt: 0 })
     return { result: `Progress shown to the user: ${s.done}/${s.total} steps done.` }
   })
 
-  // Built-in task lists, where the build has them, feed the same view.
+  // Built-in task lists, where the build has them, feed the same view; a long turn
+  // with no report at all gets one reminder appended to a tool result.
   on('tool.call', async ($, e, next) => {
     const ran = await next(e)
     const name: string = e.tool
-    if (e.agentId !== undefined || ran.deny !== undefined || ran.isError === true) return ran
-    if (name === 'TodoWrite') {
-      await adopt($, toSteps((e as unknown as { todos?: unknown }).todos), 'todo')
-    } else if (TASK_TOOLS.includes(name)) {
-      const steps = await readTaskList($)
-      if (steps !== null) await adopt($, steps, 'tasks')
+    if (e.agentId !== undefined || ran.deny !== undefined || name === TOOL) return ran
+    if (ran.isError !== true) {
+      if (name === 'TodoWrite') {
+        reportedThisTurn = true
+        await adopt($, toSteps((e as unknown as { todos?: unknown }).todos), 'todo')
+      } else if (TASK_TOOLS.includes(name)) {
+        reportedThisTurn = true
+        const steps = await readTaskList($)
+        if (steps !== null) await adopt($, steps, 'tasks')
+      }
     }
-    return ran
+    callsThisTurn += 1
+    if (reportedThisTurn || nudgedThisTurn || callsThisTurn < NUDGE_AFTER_CALLS) return ran
+    if (!(await $.tool.list()).some(tool => tool.name === TOOL)) return ran
+    nudgedThisTurn = true
+    const p = await read($, plan)
+    const reminder = hasSteps(p) && !summarize(p).isComplete ? NUDGE_STALE : NUDGE_NEW
+    return { ...ran, context: [...(ran.context ?? []), reminder] }
   })
 
   on('command.run', { command: 'progress' }, async ($, e) => {
@@ -280,6 +304,9 @@ export const register: Register = (on, options) => {
 
   // Subagent runs raise no turn.start, and their turn.complete carries an agentId.
   on('turn.start', async ($, e, next) => {
+    callsThisTurn = 0
+    reportedThisTurn = false
+    nudgedThisTurn = false
     await update($, isWorking, () => true)
     ticker?.cancel()
     ticker = $.clock.every(1000, () => {

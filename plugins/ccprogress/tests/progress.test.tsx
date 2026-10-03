@@ -1,4 +1,5 @@
 import { expect, mock, test } from 'claude-code/testing'
+import type { Engine } from 'claude-code/testing'
 import type { On, RenderPropsOf } from 'claude-code'
 
 const PLUGIN = 'ccprogress'
@@ -390,4 +391,67 @@ test('system mode falls back to notify-send without osascript', { options: { not
   await $.tool.call({ tool: TOOL, steps: STEPS })
   await $.tool.call({ tool: TOOL, steps: DONE })
   expect(runs.map(argv => argv[0])).toEqual(['osascript', 'notify-send'])
+})
+
+function offered(on: On, tools: string[] = [TOOL]) {
+  on('tool.list', () => ({ value: tools.map(name => ({ name, description: '', mcp: true })) }))
+  on('tool.call', () => ({ result: {} }))
+}
+
+// Runs `count` main-loop actions and returns the reminder context each one carried.
+async function reminders($: Engine, count: number, agentId?: string) {
+  const seen: (readonly string[] | undefined)[] = []
+  for (let i = 0; i < count; i++) {
+    const ran = await $.tool.call({ tool: 'Read', file_path: `/tmp/file-${i}`, ...(agentId ? { agentId } : {}) })
+    seen.push((ran as { context?: readonly string[] }).context)
+  }
+  return seen
+}
+
+test('a long turn without a report gets one reminder on its fourth action', async ($, on) => {
+  world(on)
+  turns(on)
+  offered(on)
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  const seen = await reminders($, 6)
+  expect(seen.map(context => context?.length ?? 0)).toEqual([0, 0, 0, 1, 0, 0])
+  expect(seen[3]?.[0]).toContain('with the full plan')
+})
+
+test('a turn that reported its plan gets no reminder', async ($, on) => {
+  world(on)
+  turns(on)
+  offered(on)
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  await $.tool.call({ tool: TOOL, steps: STEPS })
+  const seen = await reminders($, 6)
+  expect(seen.every(context => context === undefined)).toBe(true)
+})
+
+test('an unfinished plan from an earlier turn gets the update reminder', async ($, on) => {
+  world(on)
+  turns(on)
+  offered(on)
+  await $.tool.call({ tool: TOOL, steps: STEPS })
+  await $.turn.start({ text: 'go on', turnId: 't2' })
+  const seen = await reminders($, 4)
+  expect(seen[3]?.[0]).toContain('still shows an unfinished plan')
+})
+
+test('no reminder when the progress tool is not offered', async ($, on) => {
+  world(on)
+  turns(on)
+  offered(on, ['TodoWrite'])
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  const seen = await reminders($, 6)
+  expect(seen.every(context => context === undefined)).toBe(true)
+})
+
+test('subagent actions do not count toward the reminder', async ($, on) => {
+  world(on)
+  turns(on)
+  offered(on)
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  const seen = await reminders($, 6, 'sub-1')
+  expect(seen.every(context => context === undefined)).toBe(true)
 })
