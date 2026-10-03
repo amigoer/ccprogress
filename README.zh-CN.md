@@ -72,6 +72,7 @@ ccprogress 是一个 [mod](https://code.claude.com/docs/en/plugins/mods/overview
 | 命令 | 作用 |
 | --- | --- |
 | `/progress` | 查看完整步骤清单：终端里打开侧边面板，Desktop 里展开进度栏。Claude 干活时也能用。 |
+| `/progress all` | 列出本机最近 24 小时内各会话的计划：项目、当前步骤、上次更新时间。 |
 | `/progress clear` | 清空当前计划。 |
 
 ## 配置
@@ -94,6 +95,22 @@ ccprogress 是一个 [mod](https://code.claude.com/docs/en/plugins/mods/overview
 - **隐私**：不联网，也不额外调用模型。只有在 `system` 通知模式下，才会启动进程来显示系统通知。计划保存在 `~/.claude/plugins/store/` 下的插件存储里；只在任务列表工具运行时读取 `~/.claude/tasks/` 下的文件。
 - **信任**：mod 以你的权限运行。`claude plugin validate plugins/ccprogress` 会列出它挂了哪些事件、调用了哪些 API。
 - **早期阶段**：mods API 仍在随 Claude Code 版本变化。
+
+## 其他工具如何读取计划
+
+每个运行 ccprogress 的会话都把计划存在同一个存储里，`/progress all` 就是靠它看到所有会话的。其他工具（比如列出所有会话的脚本）可以读取 `~/.claude/plugins/store/ccprogress_ccprogress-*.json`。这个文件是一个 JSON 对象，每个 `plan:<会话 ID>` 键对应：
+
+```json
+{
+  "goal": "Ledger CLI",
+  "steps": [{ "title": "Run the tests", "status": "in_progress" }],
+  "source": "tool",
+  "updatedAt": 1790967588567,
+  "cwd": "/Users/me/work/ledger"
+}
+```
+
+`status` 取值为 `pending`、`in_progress`、`completed`；`source` 表示步骤来自插件自带工具（`tool`）、`TodoWrite`（`todo`）还是任务列表（`tasks`）；`updatedAt` 是毫秒时间戳。只读不写：这个文件由 Claude Code 维护。
 
 ## 开发
 
@@ -133,6 +150,8 @@ claude plugin test plugins/ccprogress
 ```bash
 npx -p typescript@5 tsc -p .
 ```
+
+**发版规则。** 每个 PR 只在 [CHANGELOG.md](CHANGELOG.md) 的"Unreleased"一节记录变更，不改版本号。发版时把这些条目整理到新版本下，并升级 `plugins/ccprogress/.claude-plugin/plugin.json` 里的 `version`，已安装的用户才会收到更新。
 
 ## 声明
 

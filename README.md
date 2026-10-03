@@ -72,6 +72,7 @@ ccprogress is a [mod](https://code.claude.com/docs/en/plugins/mods/overview): a 
 | Command | What it does |
 | --- | --- |
 | `/progress` | Shows the full checklist: a side pane in the terminal, the unfolded band in the Desktop app. Works while Claude is busy. |
+| `/progress all` | Lists the plans of every session on this machine from the last 24 hours: the project, the current step, and when it last moved. |
 | `/progress clear` | Clears the current plan. |
 
 ## Settings
@@ -94,6 +95,22 @@ Change these in `/config`, or with `/plugin configure ccprogress@ccprogress`.
 - **Privacy**: no network calls and no extra model calls. A process starts only in the `system` notification mode, to show the notification. Plans are kept in the plugin's store under `~/.claude/plugins/store/`, and files are read only under `~/.claude/tasks/`, only when the task list tools run.
 - **Trust**: a mod runs with your permissions. `claude plugin validate plugins/ccprogress` lists every event it hooks and every call it makes.
 - **Early access**: the mods API still changes between Claude Code releases.
+
+## Reading plans from other tools
+
+Every session that runs ccprogress saves its plan in the same store, which is how `/progress all` sees them all. Other tools, such as a script listing your sessions, can read it from `~/.claude/plugins/store/ccprogress_ccprogress-*.json`. The file is one JSON object; each `plan:<session id>` key holds:
+
+```json
+{
+  "goal": "Ledger CLI",
+  "steps": [{ "title": "Run the tests", "status": "in_progress" }],
+  "source": "tool",
+  "updatedAt": 1790967588567,
+  "cwd": "/Users/me/work/ledger"
+}
+```
+
+`status` is `pending`, `in_progress` or `completed`; `source` says whether the steps came from the plugin's tool (`tool`), `TodoWrite` (`todo`) or the task list (`tasks`); `updatedAt` is in epoch milliseconds. Read the file, never write it: Claude Code owns it.
 
 ## Development
 
@@ -133,6 +150,8 @@ For editor types, run `/plugin-types` in a session started from the repository r
 ```bash
 npx -p typescript@5 tsc -p .
 ```
+
+**Releases.** A pull request adds its entry under **Unreleased** in [CHANGELOG.md](CHANGELOG.md) and leaves the version alone. A release moves those entries under a new version and bumps `version` in `plugins/ccprogress/.claude-plugin/plugin.json`, which is what makes installed copies update.
 
 ## Disclaimer
 
