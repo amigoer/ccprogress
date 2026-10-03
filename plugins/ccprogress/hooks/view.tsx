@@ -9,6 +9,7 @@ import { wordsFor } from './words'
 
 export const ACCENT = '#d97757'
 const SUCCESS = '#22a06b'
+const WARNING = '#d1453b'
 const PALETTE = { done: SUCCESS, current: ACCENT }
 const GLYPHS: Record<ProgressStatus, string> = { completed: '✓', in_progress: '●', pending: '○' }
 const PHASE_ALT: Record<Phase, string> = { working: 'In progress', paused: 'Paused', done: 'Done' }
@@ -77,14 +78,22 @@ function bar(kit: Kit, surface: RenderSurface, plan: ProgressPlan, columns: numb
   )
 }
 
-export type RowOptions = { surface: RenderSurface; columns: number | undefined; isWorking: boolean }
+// How long the running step has taken, shown while a turn runs.
+export type Elapsed = { text: string; isStuck: boolean }
+
+export type RowOptions = {
+  surface: RenderSurface
+  columns: number | undefined
+  isWorking: boolean
+  elapsed?: Elapsed | undefined
+}
 
 // The terminal lines it up with the spinner's text, the spinner's glyph being two cells.
 export const TERMINAL_INDENT = 2
 
 // Desktop: what is happening on the left, how far along on the right. Terminal:
 // one left-aligned line, bar first, as a terminal progress bar reads.
-export function progressRow(kit: Kit, plan: ProgressPlan, { surface, columns, isWorking }: RowOptions): RenderNode {
+export function progressRow(kit: Kit, plan: ProgressPlan, { surface, columns, isWorking, elapsed }: RowOptions): RenderNode {
   const { Box, Text } = kit
   const s = summarize(plan)
   const words = wordsFor(isCjk(plan))
@@ -94,6 +103,10 @@ export function progressRow(kit: Kit, plan: ProgressPlan, { surface, columns, is
       {s.position}/{s.total}
     </Text>
   )
+  const timer =
+    phase === 'working' && elapsed !== undefined ? (
+      <Text {...(elapsed.isStuck ? { color: WARNING } : { dimColor: true })}>· {elapsed.text}</Text>
+    ) : null
   if (surface === 'terminal') {
     return (
       <Box key="progress-row" flexDirection="row" columnGap={2} paddingLeft={TERMINAL_INDENT} flexShrink={1}>
@@ -109,7 +122,10 @@ export function progressRow(kit: Kit, plan: ProgressPlan, { surface, columns, is
             )}
           </Box>
         ) : (
-          <Text wrap="truncate-end">{s.current?.title ?? ''}</Text>
+          <Box flexDirection="row" columnGap={1} flexShrink={1}>
+            <Text wrap="truncate-end">{s.current?.title ?? ''}</Text>
+            {timer}
+          </Box>
         )}
       </Box>
     )
@@ -119,6 +135,7 @@ export function progressRow(kit: Kit, plan: ProgressPlan, { surface, columns, is
       <Box flexDirection="row" alignItems="center" columnGap={1} flexGrow={1} flexShrink={1}>
         {phaseIcon(kit, phase)}
         <Text wrap="truncate-end">{phase === 'done' ? words.allDone : (s.current?.title ?? '')}</Text>
+        {timer}
         {phase === 'done' && plan.goal !== '' && (
           <Text dimColor wrap="truncate-end">
             {plan.goal}

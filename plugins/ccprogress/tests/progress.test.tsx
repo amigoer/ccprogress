@@ -36,7 +36,7 @@ const PANE = {
 type LooseCall = (input: Record<string, unknown>) => Promise<unknown>
 
 function world(on: On) {
-  mock.clock(on, { now: 1000 })
+  const clock = mock.clock(on, { now: 1000 })
   mock.store(on)
   on('session.id', () => ({ value: 'session-1' }))
   // Stands in for what the engine draws at its own sites.
@@ -45,6 +45,30 @@ function world(on: On) {
     const suffix = e.component === 'Spinner' ? e.props.suffix : ''
     return <Text key="engine">engine{suffix}</Text>
   })
+  return clock
+}
+
+function toastsOf(on: On): string[] {
+  const texts: string[] = []
+  on('ui.toast', (_$, e) => {
+    texts.push(e.text)
+    return { value: undefined }
+  })
+  return texts
+}
+
+function processesOf(on: On, failing: string[] = []): string[][] {
+  const runs: string[][] = []
+  on('process.run', (_$, e) => {
+    runs.push([...e.argv])
+    if (failing.includes(e.argv[0] ?? '')) return { deny: 'cannot start' }
+    return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } as never }
+  })
+  return runs
+}
+
+function turns(on: On) {
+  on('turn.start', (_$, e) => ({ turnId: e.turnId }))
 }
 
 test('the terminal draws the bar right above the spinner', async ($, on) => {
@@ -293,4 +317,77 @@ test('errors and the desktop keep the engine tool rows', async ($, on) => {
 
   const desktop = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'ToolUse', props: toolRow({ steps: STEPS }) })
   expect(await desktop.find({ type: 'Text', text: 'engine' })).toBeDefined()
+})
+
+test('finishing a plan raises one toast', async ($, on) => {
+  world(on)
+  const toasts = toastsOf(on)
+  await $.tool.call({ tool: TOOL, goal: 'Fix login bug', steps: STEPS })
+  await $.tool.call({ tool: TOOL, goal: 'Fix login bug', steps: DONE })
+  await $.tool.call({ tool: TOOL, goal: 'Fix login bug', steps: DONE })
+  expect(toasts).toEqual(['All 3 steps done · Fix login bug (0s)'])
+})
+
+test('the row shows how long the running step has taken', async ($, on) => {
+  const clock = world(on)
+  turns(on)
+  await $.tool.call({ tool: TOOL, goal: 'Fix login bug', steps: STEPS })
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  await clock.advance(65_000)
+
+  const desktop = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'AbovePrompt', props: band(true) })
+  expect(await desktop.find({ type: 'Text', text: '· 1m 5s' })).toBeDefined()
+  const terminal = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'Spinner', props: SPINNER })
+  expect(await terminal.find({ type: 'Text', text: '· 1m 5s' })).toBeDefined()
+})
+
+test('a step running past the threshold raises one stuck alert and turns the timer red', async ($, on) => {
+  const clock = world(on)
+  const toasts = toastsOf(on)
+  turns(on)
+  await $.tool.call({ tool: TOOL, goal: 'Fix login bug', steps: STEPS })
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  await clock.advance(5 * 60_000)
+  expect(toasts).toEqual(['"Write the fix" has been running for 5m 0s; it may be stuck'])
+
+  await clock.advance(60_000)
+  expect(toasts).toHaveLength(1)
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'Spinner', props: SPINNER })
+  expect(await ui.find({ type: 'Text', text: '· 6m 0s' })).toMatchObject({ props: { color: '#d1453b' } })
+})
+
+test('a threshold of 0 turns the stuck alert off', { options: { stuck_minutes: 0 } }, async ($, on) => {
+  const clock = world(on)
+  const toasts = toastsOf(on)
+  turns(on)
+  await $.tool.call({ tool: TOOL, steps: STEPS })
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  await clock.advance(10 * 60_000)
+  expect(toasts).toHaveLength(0)
+})
+
+test('toast mode never starts a process', async ($, on) => {
+  world(on)
+  const runs = processesOf(on)
+  await $.tool.call({ tool: TOOL, steps: STEPS })
+  await $.tool.call({ tool: TOOL, steps: DONE })
+  expect(runs).toHaveLength(0)
+})
+
+test('system mode sends an escaped desktop notification', { options: { notify: 'system' } }, async ($, on) => {
+  world(on)
+  const runs = processesOf(on)
+  await $.tool.call({ tool: TOOL, goal: 'Say "hi"', steps: STEPS })
+  await $.tool.call({ tool: TOOL, goal: 'Say "hi"', steps: DONE })
+  expect(runs).toHaveLength(1)
+  expect(runs[0]?.[0]).toBe('osascript')
+  expect(runs[0]?.[2]).toContain('Say \\"hi\\"')
+})
+
+test('system mode falls back to notify-send without osascript', { options: { notify: 'system' } }, async ($, on) => {
+  world(on)
+  const runs = processesOf(on, ['osascript'])
+  await $.tool.call({ tool: TOOL, steps: STEPS })
+  await $.tool.call({ tool: TOOL, steps: DONE })
+  expect(runs.map(argv => argv[0])).toEqual(['osascript', 'notify-send'])
 })

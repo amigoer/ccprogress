@@ -1,9 +1,10 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, PluginOptions, Register, Timer } from 'claude-code'
 
 import type { ProgressPlan, ProgressSource, ProgressStep } from '../types'
-import { hasSteps, isCjk, summarize, toSteps } from './plan'
+import { formatDuration, hasSteps, isCjk, isStuck, stepElapsed, summarize, toSteps, withTiming } from './plan'
 import { checklist, progressRow, reportLine, TERMINAL_INDENT, textSummary } from './view'
+import type { Elapsed } from './view'
 import { wordsFor } from './words'
 
 const PANE = 'ccprogress'
@@ -18,6 +19,23 @@ const HUMAN_ORIGINS = ['composer', 'sdk', 'bridge']
 const plan = atom({ plugin: 'ccprogress', key: 'plan' } as const, null)
 const isExpanded = atom({ plugin: 'ccprogress', key: 'isExpanded' } as const, false)
 const isWorking = atom({ plugin: 'ccprogress', key: 'isWorking' } as const, false)
+// Wall time, written once a second while a turn runs; drawings that read it redraw with it.
+const tick = atom({ plugin: 'ccprogress', key: 'tick' } as const, 0)
+
+type Config = { stuckMs: number; notify: 'toast' | 'system' }
+
+let config: Config = { stuckMs: 5 * 60_000, notify: 'toast' }
+let ticker: Timer | undefined
+// The step already warned about, so one stuck step raises one alert.
+let alertedStep: string | undefined
+
+function configFrom(options: PluginOptions): Config {
+  const minutes = Number(options.stuck_minutes ?? 5)
+  return {
+    stuckMs: Number.isFinite(minutes) && minutes > 0 ? minutes * 60_000 : 0,
+    notify: options.notify === 'system' ? 'system' : 'toast',
+  }
+}
 
 const TOOL_DESCRIPTION = [
   'Show the user a live progress bar for the current task.',
@@ -86,15 +104,56 @@ async function prune($: EngineInterface) {
   for (const { key } of dated.slice(KEEP_SESSIONS)) await $.store.delete(key)
 }
 
+// Step titles come from the model, so they are escaped before AppleScript reads them.
+function appleString(text: string): string {
+  return `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+}
+
+async function notify($: EngineInterface, text: string) {
+  $.ui.toast(text, { timeoutMs: 8000 })
+  if (config.notify !== 'system') return
+  try {
+    await $.process.run(['osascript', '-e', `display notification ${appleString(text)} with title "ccprogress"`])
+  } catch {
+    try {
+      await $.process.run(['notify-send', 'ccprogress', text])
+    } catch {
+      // Neither notifier exists here; the toast already showed.
+    }
+  }
+}
+
 async function adopt($: EngineInterface, steps: ProgressStep[], source: ProgressSource, goal?: string) {
   if (steps.length === 0) return persist($, null)
   const previous = await read($, plan)
-  await persist($, {
-    goal: goal ?? previous?.goal ?? '',
-    steps,
-    source,
-    updatedAt: await $.clock.now(),
-  })
+  const now = await $.clock.now()
+  const next = withTiming({ goal: goal ?? previous?.goal ?? '', steps, source, updatedAt: now }, previous, now)
+  await persist($, next)
+  const s = summarize(next)
+  const wasComplete = previous !== null && summarize(previous).isComplete
+  if (s.isComplete && !wasComplete) {
+    const words = wordsFor(isCjk(next))
+    await notify($, words.doneToast(s.total, next.goal, formatDuration(now - (next.startedAt ?? now))))
+  }
+}
+
+async function tickOnce($: EngineInterface) {
+  const now = await $.clock.now()
+  await update($, tick, () => now)
+  const p = await read($, plan)
+  if (!hasSteps(p) || !isStuck(p, now, config.stuckMs)) return
+  const key = `${p.stepKey}@${p.stepStartedAt}`
+  if (key === alertedStep) return
+  alertedStep = key
+  const title = p.steps.find(step => step.status === 'in_progress')?.title ?? ''
+  await notify($, wordsFor(isCjk(p)).stuckToast(title, formatDuration(stepElapsed(p, now) ?? 0)))
+}
+
+async function elapsedOf($: EngineInterface, p: ProgressPlan): Promise<Elapsed | undefined> {
+  const now = Math.max(await read($, tick), p.updatedAt)
+  const ms = stepElapsed(p, now)
+  if (ms === undefined) return undefined
+  return { text: formatDuration(ms), isStuck: isStuck(p, now, config.stuckMs) }
 }
 
 // The task list tools write one JSON file per task; reading them back is
@@ -127,7 +186,9 @@ async function readTaskList($: EngineInterface): Promise<ProgressStep[] | null> 
   }
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  config = configFrom(options)
+
   on('session.start', async ($, e, next) => {
     const tools = await $.tool.list()
     if (!tools.some(tool => BUILTIN_LISTS.includes(tool.name))) {
@@ -220,11 +281,19 @@ export const register: Register = on => {
   // Subagent runs raise no turn.start, and their turn.complete carries an agentId.
   on('turn.start', async ($, e, next) => {
     await update($, isWorking, () => true)
+    ticker?.cancel()
+    ticker = $.clock.every(1000, () => {
+      tickOnce($).catch(() => undefined)
+    })
     return next(e)
   })
 
   on('turn.complete', async ($, e, next) => {
-    if (e.agentId === undefined) await update($, isWorking, () => false)
+    if (e.agentId === undefined) {
+      await update($, isWorking, () => false)
+      ticker?.cancel()
+      ticker = undefined
+    }
     return next(e)
   })
 
@@ -239,7 +308,14 @@ export const register: Register = on => {
     // The spinner brings its own blank line above it; ours sets the bar off the transcript.
     return (
       <Box flexDirection="column">
-        <Box marginTop={1}>{progressRow(kit, p, { surface: e.surface, columns: e.viewport?.columns, isWorking: true })}</Box>
+        <Box marginTop={1}>
+          {progressRow(kit, p, {
+            surface: e.surface,
+            columns: e.viewport?.columns,
+            isWorking: true,
+            elapsed: await elapsedOf($, p),
+          })}
+        </Box>
         {theirs}
       </Box>
     )
@@ -266,7 +342,12 @@ export const register: Register = on => {
         </Text>
       </Box>
     ) : (
-      progressRow(kit, p, { surface: e.surface, columns: e.props.bodyColumns, isWorking: e.props.isWorking })
+      progressRow(kit, p, {
+        surface: e.surface,
+        columns: e.props.bodyColumns,
+        isWorking: e.props.isWorking,
+        elapsed: await elapsedOf($, p),
+      })
     )
     const dismiss =
       e.surface === 'terminal' ? (
@@ -326,7 +407,12 @@ export const register: Register = on => {
     return (
       <Box flexDirection="column" rowGap={1}>
         {p.goal !== '' && <Text bold>{p.goal}</Text>}
-        {progressRow(kit, p, { surface: e.surface, columns: e.props.bodyColumns, isWorking: working })}
+        {progressRow(kit, p, {
+          surface: e.surface,
+          columns: e.props.bodyColumns,
+          isWorking: working,
+          elapsed: await elapsedOf($, p),
+        })}
         {checklist(kit, e.surface, p, working)}
         <Button key="clear" label={words.clear} onPress={() => persist($, null)} />
       </Box>

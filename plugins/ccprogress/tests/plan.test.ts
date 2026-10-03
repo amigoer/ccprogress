@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { barSvg, phaseIconSvg, stepIconSvg } from '../hooks/icons'
-import { barRuns, filled, isCjk, summarize, toSteps } from '../hooks/plan'
+import { barRuns, filled, formatDuration, isCjk, isStuck, stepElapsed, summarize, toSteps, withTiming } from '../hooks/plan'
 import type { ProgressPlan, ProgressStep } from '../types'
 
 const PALETTE = { done: '#0f0', current: '#f00' }
@@ -125,5 +125,43 @@ describe('isCjk', () => {
     expect(isCjk(planOf([{ title: 'Run tests', status: 'pending' }], '修复登录'))).toBe(true)
     expect(isCjk(planOf([{ title: 'Run tests', status: 'pending' }]))).toBe(false)
     expect(isCjk(null)).toBe(false)
+  })
+})
+
+describe('timing', () => {
+  test('keeps the running step clock across re-sent lists and restarts it on the next step', async () => {
+    const first = withTiming(planOf([{ title: 'a', status: 'in_progress' }, { title: 'b', status: 'pending' }]), null, 1000)
+    expect(first).toMatchObject({ startedAt: 1000, stepKey: '1:a', stepStartedAt: 1000 })
+
+    const resent = withTiming(planOf([{ title: 'a', status: 'in_progress' }, { title: 'b', status: 'pending' }]), first, 5000)
+    expect(resent).toMatchObject({ startedAt: 1000, stepKey: '1:a', stepStartedAt: 1000 })
+
+    const moved = withTiming(planOf([{ title: 'a', status: 'completed' }, { title: 'b', status: 'in_progress' }]), resent, 9000)
+    expect(moved).toMatchObject({ startedAt: 1000, stepKey: '2:b', stepStartedAt: 9000 })
+  })
+
+  test('a plan after a finished one starts its own clock', async () => {
+    const done = withTiming(planOf([{ title: 'a', status: 'completed' }]), null, 1000)
+    const fresh = withTiming(planOf([{ title: 'x', status: 'in_progress' }]), done, 20000)
+    expect(fresh).toMatchObject({ startedAt: 20000, stepStartedAt: 20000 })
+  })
+
+  test('no running step means no step clock', async () => {
+    const idle = withTiming(planOf([{ title: 'a', status: 'pending' }]), null, 1000)
+    expect(idle.stepKey).toBeUndefined()
+    expect(stepElapsed(idle, 99000)).toBeUndefined()
+  })
+
+  test('counts as stuck only past a positive threshold', async () => {
+    const running = withTiming(planOf([{ title: 'a', status: 'in_progress' }]), null, 0)
+    expect(isStuck(running, 299_999, 300_000)).toBe(false)
+    expect(isStuck(running, 300_000, 300_000)).toBe(true)
+    expect(isStuck(running, 9_000_000, 0)).toBe(false)
+  })
+
+  test('formats durations the way the spinner does', async () => {
+    expect(formatDuration(45_000)).toBe('45s')
+    expect(formatDuration(125_000)).toBe('2m 5s')
+    expect(formatDuration(3_720_000)).toBe('1h 2m')
   })
 })

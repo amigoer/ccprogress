@@ -9,10 +9,15 @@ export type ProgressPlan = {
   steps: ProgressStep[]
   source: ProgressSource
   updatedAt: number
+  // When the plan was first reported, in epoch milliseconds.
+  startedAt?: number
+  // Which step is running (`<position>:<title>`) and since when.
+  stepKey?: string
+  stepStartedAt?: number
 }
 
 declare module 'claude-code' {
   interface PluginState {
-    'ccprogress': { plan: ProgressPlan | null; isExpanded: boolean; isWorking: boolean }
+    'ccprogress': { plan: ProgressPlan | null; isExpanded: boolean; isWorking: boolean; tick: number }
   }
 }
