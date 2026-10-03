@@ -71,7 +71,7 @@ ccprogress is a [mod](https://code.claude.com/docs/en/plugins/mods/overview): a 
 
 **Colors.** Green is done, orange is the step under way, gray is still to come.
 
-**Timers and alerts.** While Claude works, the running step shows how long it has taken. Past 5 minutes the timer turns red and a toast says the step may be stuck, which is often a permission prompt nobody has answered. When every step is done, a toast says so with the total time.
+**Timers and alerts.** While Claude works, the running step shows how long it has taken: in seconds in the terminal, and in whole minutes from the first minute on in the Desktop app, which redraws the band only when something on it changes. Past 5 minutes the timer turns red and a toast says the step may be stuck, which is often a permission prompt nobody has answered. When every step is done, a toast says so with the total time.
 
 ## Commands
 

@@ -4,6 +4,10 @@ Notable changes to ccprogress. Pull requests add their entry under **Unreleased*
 
 ## Unreleased
 
+### Fixed
+
+- The Desktop band no longer flashes every second while a turn runs. It redraws only when something on it changes, so a finished or paused plan stays still, and its step timer counts whole minutes from the first minute on. The terminal timer still counts seconds.
+
 ## 0.5.0 - 2026-10-03
 
 ### Added

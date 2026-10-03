@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { barSvg, phaseIconSvg, stepIconSvg } from '../hooks/icons'
-import { barRuns, filled, formatDuration, isCjk, isStuck, stepElapsed, summarize, toSteps, withTiming } from '../hooks/plan'
+import { barRuns, filled, formatDuration, formatMinutes, isCjk, isStuck, stepElapsed, summarize, toSteps, withTiming } from '../hooks/plan'
 import type { ProgressPlan, ProgressStep } from '../types'
 
 const PALETTE = { done: '#0f0', current: '#f00' }
@@ -163,5 +163,11 @@ describe('timing', () => {
     expect(formatDuration(45_000)).toBe('45s')
     expect(formatDuration(125_000)).toBe('2m 5s')
     expect(formatDuration(3_720_000)).toBe('1h 2m')
+  })
+
+  test('counts whole minutes and shows nothing under one', async () => {
+    expect(formatMinutes(59_999)).toBeUndefined()
+    expect(formatMinutes(125_000)).toBe('2m')
+    expect(formatMinutes(3_720_000)).toBe('1h 2m')
   })
 })

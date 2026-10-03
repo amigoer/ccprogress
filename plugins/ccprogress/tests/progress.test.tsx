@@ -72,6 +72,16 @@ function turns(on: On) {
   on('turn.start', (_$, e) => ({ turnId: e.turnId }))
 }
 
+// Counts the plugin's draws of each site; registered before world() so it runs first.
+function drawsOf(on: On) {
+  const draws = { AbovePrompt: 0, Spinner: 0 }
+  on('ui.render', { component: ['AbovePrompt', 'Spinner'] }, (_$, e, next) => {
+    if (e.component === 'AbovePrompt' || e.component === 'Spinner') draws[e.component] += 1
+    return next(e)
+  })
+  return draws
+}
+
 test('the terminal draws the bar right above the spinner', async ($, on) => {
   world(on)
   const ran = await $.tool.call({ tool: TOOL, goal: 'Fix login bug', steps: STEPS })
@@ -337,9 +347,56 @@ test('the row shows how long the running step has taken', async ($, on) => {
   await clock.advance(65_000)
 
   const desktop = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'AbovePrompt', props: band(true) })
-  expect(await desktop.find({ type: 'Text', text: '· 1m 5s' })).toBeDefined()
+  expect(await desktop.find({ type: 'Text', text: /^· 1m$/ })).toBeDefined()
   const terminal = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'Spinner', props: SPINNER })
   expect(await terminal.find({ type: 'Text', text: '· 1m 5s' })).toBeDefined()
+})
+
+test('a finished plan is not redrawn while a turn runs', async ($, on) => {
+  const draws = drawsOf(on)
+  const clock = world(on)
+  turns(on)
+  await $.tool.call({ tool: TOOL, goal: 'Fix login bug', steps: DONE })
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'AbovePrompt', props: band(true) })
+  await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'Spinner', props: SPINNER })
+  const before = [draws.AbovePrompt, draws.Spinner]
+  expect(before).toEqual([1, 1])
+
+  await clock.advance(10_000)
+  expect([draws.AbovePrompt, draws.Spinner]).toEqual(before)
+})
+
+test('a paused band does not follow the clock', async ($, on) => {
+  const draws = drawsOf(on)
+  const clock = world(on)
+  turns(on)
+  await $.tool.call({ tool: TOOL, goal: 'Fix login bug', steps: STEPS })
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'AbovePrompt', props: band(false) })
+
+  await clock.advance(2 * 60_000)
+  expect(draws.AbovePrompt).toBe(1)
+})
+
+test('the Desktop band redraws for its timer once a minute, the terminal once a second', async ($, on) => {
+  const draws = drawsOf(on)
+  const clock = world(on)
+  turns(on)
+  await $.tool.call({ tool: TOOL, goal: 'Fix login bug', steps: STEPS })
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  const desktop = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'AbovePrompt', props: band(true) })
+  const terminal = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'Spinner', props: SPINNER })
+
+  await clock.advance(59_000)
+  expect(draws.AbovePrompt).toBe(1)
+  expect(await desktop.find({ type: 'Text', text: /^·/ })).toBeUndefined()
+  expect(draws.Spinner).toBe(60)
+  expect(await terminal.find({ type: 'Text', text: '· 59s' })).toBeDefined()
+
+  await clock.advance(1_000)
+  expect(draws.AbovePrompt).toBe(2)
+  expect(await desktop.find({ type: 'Text', text: /^· 1m$/ })).toBeDefined()
 })
 
 test('a step running past the threshold raises one stuck alert and turns the timer red', async ($, on) => {
