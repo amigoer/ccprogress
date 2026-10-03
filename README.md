@@ -82,6 +82,8 @@ Change these in `/config`, or with `/plugin configure ccprogress@ccprogress`.
 | --- | --- | --- |
 | `stuck_minutes` | `5` | Warns when the running step has taken this long. `0` turns the alert off. |
 | `notify` | `toast` | `toast` alerts inside the session only. `system` also sends a desktop notification, through `osascript` on macOS or `notify-send` on Linux. |
+| `fold_reports` | `true` | Shows each progress report as one dim line in the terminal transcript. Turn it off to see the full step list. |
+| `language` | `auto` | Language of the bar's labels: `en`, `zh`, or `auto` to follow the language of the steps. |
 
 ## Good to know
 
