@@ -71,7 +71,7 @@ ccprogress 是一个 [mod](https://code.claude.com/docs/en/plugins/mods/overview
 
 **颜色。** 绿色是已完成，橙色是进行中，灰色是还没开始。
 
-**计时与提醒。** Claude 干活时，当前步骤会显示已经用了多久：终端按秒计；Desktop 从第 1 分钟起按整分钟显示，进度栏只在内容有变化时才重绘。超过 5 分钟计时变红，并弹出提示说这一步可能卡住了，常见原因是有个权限确认没人点。全部步骤完成时，也会弹出提示并附上总用时。
+**计时与提醒。** Claude 干活时，当前步骤会显示已经用了多久：终端按秒计；Desktop 从第 1 分钟起按整分钟显示，进度栏只在内容有变化时才重绘。超过 5 分钟计时变红，说明这一步可能卡住了，常见原因是有个权限确认没人点。全部步骤完成时，也会弹出提示并附上总用时。
 
 ## 命令
 
@@ -87,7 +87,7 @@ ccprogress 是一个 [mod](https://code.claude.com/docs/en/plugins/mods/overview
 
 | 配置项 | 默认值 | 作用 |
 | --- | --- | --- |
-| `stuck_minutes` | `5` | 当前步骤用时超过这么多分钟就提醒。设为 `0` 关闭提醒。 |
+| `stuck_minutes` | `5` | 当前步骤用时超过这么多分钟，计时就变红。设为 `0` 则不变红。 |
 | `notify` | `toast` | `toast` 只在会话内提醒；`system` 额外发系统通知，macOS 用 `osascript`，Linux 用 `notify-send`。 |
 | `fold_reports` | `true` | 在终端 transcript 里把每次进度上报折叠成一行灰色摘要；关闭后显示完整的步骤列表。 |
 | `language` | `auto` | 进度条上的文字语言：`en`、`zh`，或 `auto` 跟随步骤的语言。 |

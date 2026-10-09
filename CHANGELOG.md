@@ -4,6 +4,10 @@ Notable changes to ccprogress. Pull requests add their entry under **Unreleased*
 
 ## Unreleased
 
+### Removed
+
+- The toast that said a step may be stuck after 5 minutes. The timer still turns red past `stuck_minutes`.
+
 ## 0.5.2 - 2026-10-03
 
 ### Fixed

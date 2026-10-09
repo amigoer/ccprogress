@@ -71,7 +71,7 @@ ccprogress is a [mod](https://code.claude.com/docs/en/plugins/mods/overview): a 
 
 **Colors.** Green is done, orange is the step under way, gray is still to come.
 
-**Timers and alerts.** While Claude works, the running step shows how long it has taken: in seconds in the terminal, and in whole minutes from the first minute on in the Desktop app, which redraws the band only when something on it changes. Past 5 minutes the timer turns red and a toast says the step may be stuck, which is often a permission prompt nobody has answered. When every step is done, a toast says so with the total time.
+**Timers and alerts.** While Claude works, the running step shows how long it has taken: in seconds in the terminal, and in whole minutes from the first minute on in the Desktop app, which redraws the band only when something on it changes. Past 5 minutes the timer turns red, since the step may be stuck, which is often a permission prompt nobody has answered. When every step is done, a toast says so with the total time.
 
 ## Commands
 
@@ -87,7 +87,7 @@ Change these in `/config`, or with `/plugin configure ccprogress@ccprogress`.
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `stuck_minutes` | `5` | Warns when the running step has taken this long. `0` turns the alert off. |
+| `stuck_minutes` | `5` | Turns the timer red when the running step has taken this long. `0` keeps it from turning red. |
 | `notify` | `toast` | `toast` alerts inside the session only. `system` also sends a desktop notification, through `osascript` on macOS or `notify-send` on Linux. |
 | `fold_reports` | `true` | Shows each progress report as one dim line in the terminal transcript. Turn it off to see the full step list. |
 | `language` | `auto` | Language of the bar's labels: `en`, `zh`, or `auto` to follow the language of the steps. |

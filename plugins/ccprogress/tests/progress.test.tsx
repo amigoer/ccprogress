@@ -421,29 +421,26 @@ test('the Desktop band redraws for its timer once a minute, the terminal once a 
   expect(await desktop.find({ type: 'Text', text: /^· 1m$/ })).toBeDefined()
 })
 
-test('a step running past the threshold raises one stuck alert and turns the timer red', async ($, on) => {
+test('a step running past the threshold turns the timer red without a toast', async ($, on) => {
   const clock = world(on)
   const toasts = toastsOf(on)
   turns(on)
   await $.tool.call({ tool: TOOL, goal: 'Fix login bug', steps: STEPS })
   await $.turn.start({ text: 'go', turnId: 't1' })
-  await clock.advance(5 * 60_000)
-  expect(toasts).toEqual(['"Write the fix" has been running for 5m 0s; it may be stuck'])
-
-  await clock.advance(60_000)
-  expect(toasts).toHaveLength(1)
+  await clock.advance(6 * 60_000)
+  expect(toasts).toHaveLength(0)
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'Spinner', props: SPINNER })
   expect(await ui.find({ type: 'Text', text: '· 6m 0s' })).toMatchObject({ props: { color: '#d1453b' } })
 })
 
-test('a threshold of 0 turns the stuck alert off', { options: { stuck_minutes: 0 } }, async ($, on) => {
+test('a threshold of 0 keeps the timer from turning red', { options: { stuck_minutes: 0 } }, async ($, on) => {
   const clock = world(on)
-  const toasts = toastsOf(on)
   turns(on)
   await $.tool.call({ tool: TOOL, steps: STEPS })
   await $.turn.start({ text: 'go', turnId: 't1' })
   await clock.advance(10 * 60_000)
-  expect(toasts).toHaveLength(0)
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'Spinner', props: SPINNER })
+  expect(await ui.find({ type: 'Text', text: '· 10m 0s' })).toMatchObject({ props: { dimColor: true } })
 })
 
 test('toast mode never starts a process', async ($, on) => {

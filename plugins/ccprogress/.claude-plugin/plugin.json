@@ -19,8 +19,8 @@
   "userConfig": {
     "stuck_minutes": {
       "type": "number",
-      "title": "Stuck alert (minutes)",
-      "description": "Warn when the current step has run this long without moving on. 0 turns the alert off.",
+      "title": "Stuck timer (minutes)",
+      "description": "Turn the timer red when the current step has run this long without moving on. 0 keeps it from turning red.",
       "default": 5,
       "min": 0,
       "max": 240

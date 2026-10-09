@@ -32,8 +32,6 @@ type Config = { stuckMs: number; notify: 'toast' | 'system'; foldReports: boolea
 
 let config: Config = { stuckMs: 5 * 60_000, notify: 'toast', foldReports: true, language: 'auto' }
 let ticker: Timer | undefined
-// The step already warned about, so one stuck step raises one alert.
-let alertedStep: string | undefined
 // Main-loop actions in the running turn, and whether it reported or was reminded.
 let callsThisTurn = 0
 let reportedThisTurn = false
@@ -198,12 +196,6 @@ async function tickOnce($: EngineInterface) {
   if (!sameTimer(timerAt(p, await read($, minuteTick), 'minute'), timerAt(p, now, 'minute'))) {
     await update($, minuteTick, () => now)
   }
-  if (!isStuck(p, now, config.stuckMs)) return
-  const key = `${p.stepKey}@${p.stepStartedAt}`
-  if (key === alertedStep) return
-  alertedStep = key
-  const title = p.steps.find(step => step.status === 'in_progress')?.title ?? ''
-  await notify($, wordsFor(isCjk(p)).stuckToast(title, formatDuration(stepElapsed(p, now) ?? 0)))
 }
 
 // Reads a clock only while the timer shows, so a finished or paused plan is not redrawn by it.
