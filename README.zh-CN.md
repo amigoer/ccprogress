@@ -1,3 +1,5 @@
+2026 年 10 月 15 日，Claude Desktop 官方已支持任务进度展示，CCProgress 完成了使命！
+
 <p align="center">
   <img src="./assets/readme/hero.svg" width="100%" alt="ccprogress：在 spinner 旁边显示实时进度条，一眼看出 Claude Code 长会话做到了哪一步">
 </p>
